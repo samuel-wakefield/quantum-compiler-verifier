@@ -42,4 +42,6 @@ def verify_vc(vc: VC, axioms: list[Expr], ctx) -> bool: # Check this logic!!!
     s.add(z3.Not(encode_expr(vc.goal, ctx)))
 
     res = s.check()
+    status = "✔ VALID" if res else "✘ NOT VALID"
+    print(f"{vc.name:25s}: {status}")
     return res == z3.unsat
