@@ -165,20 +165,98 @@ def mk_axioms():
 
     # 9b. CX cancellation: CX(q1,q2); CX(q1,q2) = Id  (as a circuit)
     #    We say: denote(mk_single(CX); mk_single(CX)) = Id
+    # cx_cancel = ForAll(
+    #     [q1, q2],
+    #     Eq(
+    #         App(
+    #             "denote",
+    #             App(
+    #                 "concat",
+    #                 App("mk_single", App("CX", q1, q2)),
+    #                 App("mk_single", App("CX", q1, q2)),
+    #             )
+    #         ),
+    #         U_id,
+    #     )
+    # )
     cx_cancel = ForAll(
-        [q1, q2],
-        Eq(
-            App(
-                "denote",
-                App(
-                    "concat",
-                    App("mk_single", App("CX", q1, q2)),
-                    App("mk_single", App("CX", q1, q2)),
-                )
+        [g1, g2],
+        Implies(
+            And(
+                App("is_CX", g1),
+                App("is_CX", g2),
+                App("same_qubits", g1, g2)
             ),
-            U_id,
+            Eq(
+                App(
+                "denote",
+                    App(
+                        "concat",
+                        App("mk_single", g1),
+                        App("mk_single", g2)
+                    )
+                ),
+                U_id,
+            )
         )
     )
     axioms.append(cx_cancel)
+    
+    # ==================================================================
+    # Head and Tail axioms
+    # ==================================================================
 
+    head_tail_join = ForAll(
+        [c1],
+        Eq(
+            App(
+                "concat",
+                App("mk_single", App("Head", c1)),
+                App("Tail", c1),
+            ),
+            c1,
+        ),
+    )
+    axioms.append(head_tail_join)
+    g  = Var("g", "Gate")
+
+    head_of_concat = ForAll(
+        [g, c2],
+        Eq(
+            App("Head",
+                App("concat",
+                    App("mk_single", g),
+                    c2,
+                )
+            ),
+            g,
+        ),
+    )
+    axioms.append(head_of_concat)
+    tail_of_concat = ForAll(
+        [g, c2],
+        Eq(
+            App("Tail",
+                App("concat",
+                    App("mk_single", g),
+                    c2,
+                )
+            ),
+            c2,
+        ),
+    )
+    axioms.append(tail_of_concat)
+    # Disjoint commutation
+    disjoint_swap = ForAll(
+        [g, c1],
+        Implies(
+            App("all_disjoint", g, c1),
+            Eq(
+                App("concat", App("mk_single", g), c1),
+                App("concat", c1, App("mk_single", g)),
+            )
+        )
+    )
+    axioms.append(disjoint_swap)
     return axioms
+

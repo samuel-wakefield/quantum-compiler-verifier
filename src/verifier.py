@@ -29,6 +29,7 @@ def encode_expr(e, ctx):
 
 def verify_vc(vc: VC, axioms: list[Expr], ctx) -> bool: # Check this logic!!!
     s = z3.Solver()
+    s.set("timeout", 10_000)
     # add global axioms (rewrite rules, semantic laws)
     for ax in axioms:
         s.add(encode_expr(ax, ctx))

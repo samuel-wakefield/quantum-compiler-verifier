@@ -2,9 +2,10 @@
 
 import z3
 
-from VC import Var, Eq, Implies, VC, App, Not
+from VC import Var, Eq, And, VC, App, Not
 from verifier import verify_vc
 from mk_axioms import mk_axioms
+from utility_requirements import ng_specification
 
 class Ctx:
     """
@@ -25,7 +26,12 @@ class Ctx:
             "denote_gate": ("Gate", "Unitary"),
             "CX": ("Qubit", "Qubit", "Gate"),
             "disjoint" : ("Gate", "Gate", "Bool"),
-            "CXU": ("Qubit", "Qubit", "Unitary")
+            "CXU": ("Qubit", "Qubit", "Unitary"),
+            "is_CX": ("Gate", "Bool"),
+            "Head": ("Circuit", "Gate"),
+            "Tail": ("Circuit", "Circuit"),
+            "same_qubits": ("Gate", "Gate", "Bool"),
+            "all_disjoint": ("Gate", "Circuit", "Bool")
             }
 
     def sort(self, name):
@@ -41,9 +47,6 @@ class Ctx:
                 # Circuit, Gate, Unitary, Qubit, etc.
                 self._sorts[name] = z3.DeclareSort(name)
         return self._sorts[name]
-
-    def signature(self, name):
-        return self._signatures[name]
 
     def var(self, name, sort):
         key = (name, sort)
@@ -66,7 +69,7 @@ class Ctx:
         if name in self._funcs:
             return self._funcs[name]
 
-        sorts = self.signature(name)
+        sorts = self._signatures[name]
         f = z3.Function(name, *[self.sort(s) for s in sorts])
         self._funcs[name] = f
         return f
@@ -85,8 +88,7 @@ def build_vcs():
     ctx = Ctx()  # same ctx instance can be reused across VCs
 
     # Boolean variables (as Exprs)
-    P = Var("P", "Bool")
-    Q = Var("Q", "Bool")
+    gate_v = Var("gate", "Gate")
 
     input_v  = Var("input",  "Circuit")
     output_v = Var("output", "Circuit")
@@ -99,17 +101,9 @@ def build_vcs():
 
     vcs = []
 
-    # VC 1: Modus ponens: from P and (P -> Q), prove Q
-    vc1 = VC(
-        name="modus_ponens",
-        assumptions=[
-            P,                      # assert P is true
-            Implies(P, Q),          # P -> Q
-        ],
-        goal=Q,                     # want to prove Q
-    )
-    vcs.append(vc1)
-    
+    # ------------------------------------------------------------------
+    # VC 0 – loop initialization
+    # ------------------------------------------------------------------
     vc_init = VC(
         name="loop_init",
         assumptions=[
@@ -119,7 +113,84 @@ def build_vcs():
         goal=inv(output_v, remain_v, input_v),
     )
     vcs.append(vc_init)
+    # ------------------------------------------------------------------
+    # VC 1-3 – branches
+    # ------------------------------------------------------------------
+
+    pc1 = Not(App("is_CX", gate_v)) # Path 1  (non-CX)
+    step1 = And(
+        Eq(
+            output1_v,
+            App("concat", output_v, App("mk_single", gate_v)),
+        ),
+        Eq(
+            remain1_v,
+            App("Tail", remain_v),
+        ),
+    )
+    vc_b1 = VC(
+        name="branch1_preservation",
+        assumptions=[
+            inv(output_v, remain_v, input_v),
+            Eq(App("Head", remain_v),gate_v),
+            pc1,
+            step1,
+        ],
+        goal=inv(output1_v, remain1_v, input_v),
+    )
+    vcs.append(vc_b1)
     
+    g_v = Var("g", "Gate")
+    cM = Var("cM", "Circuit")
+    cR = Var("cR", "Circuit")
+    ng = ng_specification(gate_v, g_v, cM, cR, remain_v)
+    pc2 = And(App("is_CX", gate_v), Not(And(App("is_CX", g_v), Not(App("disjoint", gate_v, g_v))))) # Path 2  (CX but no match)
+    step2 = And(
+        Eq(
+            output1_v,
+            App("concat", output_v, App("mk_single", gate_v)),
+        ),
+        Eq(
+            remain1_v,
+            App("Tail", remain_v),
+        ),
+    )
+    vc_b2 = VC(
+        name="branch2_preservation",
+        assumptions=[
+            inv(output_v, remain_v, input_v),
+            Eq(App("Head", remain_v), gate_v),
+            ng,
+            pc2,
+            step2,
+        ],
+        goal=inv(output1_v, remain1_v, input_v),
+    )
+    vcs.append(vc_b2)
+    
+    pc3 = And(App("is_CX", gate_v), App("is_CX", g_v), App("same_qubits", gate_v, g_v))  # Path 3  (cancellation)
+    step3 = And(
+        Eq(output1_v, output_v),
+        Eq(
+            remain1_v,
+            App("concat", cM, cR)
+        ),  
+    )
+    vc_b3 = VC(
+        name="branch3_preservation",
+        assumptions=[
+            inv(output_v, remain_v, input_v),
+            Eq(App("Head", remain_v), gate_v),
+            ng,
+            pc3,
+            step3,
+        ],
+        goal=inv(output1_v, remain1_v, input_v)
+    )
+    vcs.append(vc_b3)
+    # ------------------------------------------------------------------
+    # VC 4 – loop exit
+    # ------------------------------------------------------------------
     vc_loop_exit = VC(
         name="loop_exit",
         assumptions=[
@@ -145,12 +216,10 @@ def main():
 
     # Basic assertions so this can act as a simple test script
     vc_results = {vc.name: verify_vc(vc, axioms, ctx) for vc in vcs}
-    assert vc_results["modus_ponens"] is True
-    assert vc_results["loop_init"] is True
-    assert vc_results["loop_exit"] is True
+    for _,res in vc_results.items():
+        assert res is True
 
     print("\nAll expected checks passed.")
-
 
 if __name__ == "__main__":
     main()
