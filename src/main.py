@@ -1,4 +1,5 @@
 from cx_cancellation import CX_Cancellation
+from bad_pass import BadPass
 from verifier import verify_vc
 from preprocessor import get_vcs
 from mk_axioms import mk_axioms
@@ -13,3 +14,4 @@ def verify_pass(compiler_pass):
         verify_vc(vc, axioms, ctx)
         
 verify_pass(CX_Cancellation.run)
+verify_pass(BadPass.run)
