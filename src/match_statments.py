@@ -205,10 +205,10 @@ def spec_remain_delete_zero_alone(stmt, vars):
         return None
 
     # Optionally also assert output unchanged:
-    # return And(Eq(remain1_v, App("Tail", remain_v)),
-    #            Eq(output1_v, output_v))
+    return And(Eq(remain1_v, App("Tail", remain_v)),
+               Eq(output1_v, output_v))
 
-    return Eq(remain1_v, App("Tail", remain_v))
+    # return Eq(remain1_v, App("Tail", remain_v))
 
 def is_remain_delete_nxt(stmt):
     # match: remain.delete(nxt)
@@ -249,4 +249,3 @@ def is_remain_delete_zero(stmt):
         return False
     arg = call.args[0]
     return isinstance(arg, ast.Constant) and arg.value == 0
-

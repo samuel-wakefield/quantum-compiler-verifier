@@ -1,8 +1,8 @@
-from circuit import QCircuit
+from circuit import QCircuit, QGate
 from utility import next_gate
 
 class CX_Cancellation:
-    def run(self, input: QCircuit):
+    def run(self, input: QCircuit): # input = remain; output
         remain = input.copy()
         output = QCircuit()
         while remain.size() != 0:
@@ -18,4 +18,3 @@ class CX_Cancellation:
                 output.append(gate)
             remain.delete(0)
         return output
-    

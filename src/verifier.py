@@ -1,6 +1,7 @@
 # --verifier.py--
 
 import z3
+import time
 from VC import *
 
 def encode_expr(e, ctx):
@@ -27,9 +28,10 @@ def encode_expr(e, ctx):
         return z3.ForAll(z3_vars, encode_expr(e.body, ctx))
     raise TypeError(e)
 
-def verify_vc(vc: VC, axioms: list[Expr], ctx) -> bool: # Check this logic!!!
+def verify_vc(vc: VC, axioms: list[Expr], ctx) -> bool:
+    start = time.time()
     s = z3.Solver()
-    s.set("timeout", 10_000)
+    s.set("timeout", 2_469)
     # add global axioms (rewrite rules, semantic laws)
     for ax in axioms:
         s.add(encode_expr(ax, ctx))
@@ -42,6 +44,13 @@ def verify_vc(vc: VC, axioms: list[Expr], ctx) -> bool: # Check this logic!!!
     s.add(z3.Not(encode_expr(vc.goal, ctx)))
 
     res = s.check()
-    status = "✔ VALID" if res == z3.unsat else "✘ NOT VALID"
-    print(f"{vc.name:25s}: {status}")
-    return res == z3.unsat
+    end = time.time()
+    vt = end-start
+    if res == z3.unsat:
+        print(f"{vc.name:25s}: ✔ VALID - {vt}s")
+        return True
+
+    else:
+        print(f"{vc.name:25s}: ✘ NOT VALID - {vt}s")
+
+        return False

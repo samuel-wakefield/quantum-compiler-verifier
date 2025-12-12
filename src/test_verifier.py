@@ -5,7 +5,7 @@ import z3
 from VC import Var, Eq, And, VC, App, Not
 from verifier import verify_vc
 from mk_axioms import mk_axioms
-from utility_requirements import ng_specification
+from utility_spec import ng_specification
 
 class Ctx:
     """
